@@ -15,6 +15,7 @@ dotenv.config();
 const app = express();
 
 const allowedOrigins = [
+  'https://frontend-movie-beta.vercel.app/',
   'http://localhost:5173',
   'http://localhost:5174',
   process.env.FRONTEND_URL
