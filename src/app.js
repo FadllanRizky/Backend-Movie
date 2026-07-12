@@ -14,18 +14,37 @@ dotenv.config();
 
 const app = express();
 
+// Hapus tanda '/' di paling akhir domain vercel agar CORS membacanya dengan benar
 const allowedOrigins = [
-  'https://frontend-movie-beta.vercel.app/',
+  'https://frontend-movie-beta.vercel.app', // Tanda / di ujung sudah dihapus
   'http://localhost:5173',
   'http://localhost:5174',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
+// Konfigurasi CORS dasar
 app.use(cors({
   origin: allowedOrigins,
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true
 }));
+
+// Middleware Tambahan Khusus Vercel Serverless untuk menangani Preflight (OPTIONS)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  
+  // Jika browser mengirimkan request OPTIONS, langsung kunci dengan status 200 OK
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
 
 app.use(express.json());
 
@@ -36,7 +55,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/profil", profileRoutes);
 app.use("/api/movie-actors", movieActorRoutes);
 app.use("/api/movie-reviews", movieReviewRoutes);
-app.use("/api/genres", genreRoutes); // Ditambahkan '/api' di depannya agar seragam
+app.use("/api/genres", genreRoutes);
 
 // Health check rute utama
 app.get("/api", (req, res) => {
