@@ -2,12 +2,12 @@ import express from "express";
 const router = express.Router();
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { supabase }from "../config/database.js";
+import { supabase } from "../config/database.js";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /* =========================
-   REGISTER (USER)
+    REGISTER (USER)
 ========================= */
 router.post("/register", async (req, res) => {
   const { fullname, email, password } = req.body;
@@ -22,31 +22,36 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ msg: "Password minimal 5 karakter" });
 
   try {
-    const { data: existing } = await supabase
+    // KUNCI PERBAIKAN: Gunakan select biasa tanpa .single() agar tidak crash jika email belum terdaftar
+    const { data: existing, error: checkError } = await supabase
       .from("users")
       .select("id")
-      .eq("email", email)
-      .single();
+      .eq("email", email);
 
-    if (existing)
+    if (checkError) throw checkError;
+
+    // Jika array existing ada isinya, berarti email sudah terpakai
+    if (existing && existing.length > 0) {
       return res.status(400).json({ msg: "Email sudah digunakan" });
+    }
 
     const hash = await bcrypt.hash(password, 10);
 
-    const { error } = await supabase
+    const { error: insertError } = await supabase
       .from("users")
       .insert([{ fullname, email, password: hash, role: "user" }]);
 
-    if (error) throw error;
+    if (insertError) throw insertError;
 
-    res.json({ msg: "Register berhasil" });
+    return res.json({ msg: "Register berhasil" });
   } catch (err) {
-    return res.status(500).json({ msg: "Database error" });
+    console.error("❌ SUPABASE REGISTER ERROR:", err);
+    return res.status(500).json({ msg: "Database error", details: err.message || err });
   }
 });
 
 /* =========================
-   LOGIN (ADMIN & USER)
+    LOGIN (ADMIN & USER)
 ========================= */
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -55,15 +60,19 @@ router.post("/login", async (req, res) => {
     return res.status(400).json({ msg: "Email dan password wajib diisi" });
 
   try {
-    const { data: user } = await supabase
+    // Untuk login kita bisa pakai select biasa untuk menghindari crash jika email salah
+    const { data: users, error: loginError } = await supabase
       .from("users")
       .select("*")
-      .eq("email", email)
-      .single();
+      .eq("email", email);
 
-    if (!user)
+    if (loginError) throw loginError;
+
+    if (!users || users.length === 0) {
       return res.status(400).json({ msg: "Email tidak terdaftar" });
+    }
 
+    const user = users[0];
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch)
@@ -75,7 +84,7 @@ router.post("/login", async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    res.json({
+    return res.json({
       msg: "Login berhasil",
       token,
       user: {
@@ -86,7 +95,8 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    return res.status(500).json({ msg: "Database error" });
+    console.error("❌ SUPABASE LOGIN ERROR:", err);
+    return res.status(500).json({ msg: "Database error", details: err.message || err });
   }
 });
 
