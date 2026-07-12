@@ -16,7 +16,7 @@ const app = express();
 
 // Hapus tanda '/' di paling akhir domain vercel agar CORS membacanya dengan benar
 const allowedOrigins = [
-  'https://frontend-movie-beta.vercel.app', // Tanda / di ujung sudah dihapus
+  'https://movie.fadllan.web.id', // Tanda / di ujung sudah dihapus
   'http://localhost:5173',
   'http://localhost:5174',
   process.env.FRONTEND_URL
